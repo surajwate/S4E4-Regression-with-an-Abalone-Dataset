@@ -11,7 +11,7 @@ def create_fold(fold):
     data = data.sample(frac=1).reset_index(drop=True)
 
     num_bins = int(np.floor(1 + np.log2(len(data))))
-    data["bins"] = pd.cut(data["FloodProbability"], bins=num_bins, labels=False)
+    data["bins"] = pd.cut(data["Rings"], bins=num_bins, labels=False)
 
     y = data["bins"].values
 

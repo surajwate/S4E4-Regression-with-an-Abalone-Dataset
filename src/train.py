@@ -1,7 +1,10 @@
 import pandas as pd
 import numpy as np
-from sklearn.preprocessing import StandardScaler, LabelEncoder
-from sklearn.metrics import r2_score
+from sklearn.preprocessing import StandardScaler, LabelEncoder, OneHotEncoder
+from sklearn.metrics import root_mean_squared_log_error
+
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
 
 import os
 import argparse
@@ -29,21 +32,30 @@ def run(fold, model):
     test = df[df.kfold == fold].reset_index(drop=True)
 
     # Split the data into features and target
-    X_train = train.drop(['id', 'FloodProbability', 'kfold'], axis=1)
-    X_test = test.drop(['id', 'FloodProbability', 'kfold'], axis=1)
+    X_train = train.drop(['id', 'Rings', 'kfold'], axis=1)
+    X_test = test.drop(['id', 'Rings', 'kfold'], axis=1)
 
-    y_train = train.FloodProbability.values
-    y_test = test.FloodProbability.values
+    y_train = train.Rings.values
+    y_test = test.Rings.values
 
-    # Initialize the StandardScaler
-    scaler = StandardScaler()
+    # Define categorical and numerical columns
+    categorical_cols = ['Sex']
+    numerical_cols = [col for col in X_train.columns if col not in categorical_cols]
 
-    # Fit and transform the training data
-    X_train = scaler.fit_transform(X_train)
-    X_test = scaler.transform(X_test)
+    # Create a column transformer for one-hot encoding and standard scaling
+    preprocessor = ColumnTransformer(
+        transformers=[
+            ('num', StandardScaler(), numerical_cols),
+            ('cat', OneHotEncoder(drop='first'), categorical_cols)
+        ]
+    )
 
-    # Initialize the model
-    model = model_dispatcher.models[model]
+    # Create a pipeline with the preprocessor and the model
+    pipeline = Pipeline(steps=[
+        ('preprocessor', preprocessor),
+        ('model', model_dispatcher.models[model])
+    ])
+
 
     try:
         start = time.time()
@@ -51,21 +63,24 @@ def run(fold, model):
         # logging.info(f"Fold={fold}, Model={model}")
 
         # Fit the model
-        model.fit(X_train, y_train)
+        pipeline.fit(X_train, y_train)
 
         # make predictions
-        preds = model.predict(X_test)
+        preds = pipeline.predict(X_test)
+
+        # Clip predictions to avoid negative values
+        preds = np.clip(preds, 0, None)
 
         end = time.time()
         time_taken = end - start
 
         # Calculate the R2 score
-        r2 = r2_score(y_test, preds)
-        print(f"Fold={fold}, R2 Score={r2:.4f}, Time={time_taken:.2f}sec")
-        logging.info(f"Fold={fold}, R2 Score={r2:.4f}, Time Taken={time_taken:.2f}sec")
+        rmsle = root_mean_squared_log_error(y_test, preds)
+        print(f"Fold={fold}, R2 Score={rmsle:.4f}, Time={time_taken:.2f}sec")
+        logging.info(f"Fold={fold}, R2 Score={rmsle:.4f}, Time Taken={time_taken:.2f}sec")
 
         # Save the model
-        joblib.dump(model, os.path.join(config.MODEL_OUTPUT, f"model_{fold}.bin"))
+        joblib.dump(pipeline, os.path.join(config.MODEL_OUTPUT, f"model_{fold}.bin"))
     except Exception as e:
         logging.exception(f"Error occurred for Fold={fold}, Model={model}: {str(e)}")
     
