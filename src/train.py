@@ -74,10 +74,10 @@ def run(fold, model):
         end = time.time()
         time_taken = end - start
 
-        # Calculate the R2 score
+        # Calculate the RMSLE
         rmsle = root_mean_squared_log_error(y_test, preds)
-        print(f"Fold={fold}, R2 Score={rmsle:.4f}, Time={time_taken:.2f}sec")
-        logging.info(f"Fold={fold}, R2 Score={rmsle:.4f}, Time Taken={time_taken:.2f}sec")
+        print(f"Fold={fold}, RMSLE={rmsle:.4f}, Time={time_taken:.2f}sec")
+        logging.info(f"Fold={fold}, RMSLE={rmsle:.4f}, Time Taken={time_taken:.2f}sec")
 
         # Save the model
         joblib.dump(pipeline, os.path.join(config.MODEL_OUTPUT, f"model_{fold}.bin"))
